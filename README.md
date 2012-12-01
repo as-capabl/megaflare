@@ -36,6 +36,7 @@ Jamfile等で以下のように宣言します。
   - opencl
   - code
   - host 
+
 megaflare/code.hppをインクルードする場合はmegaflare//code, megaflare/host.hpp をインクルードする場合はmegaflare//hostを、exe等のルールのソースに指定して下さい。
 
 ### bjamを使用しない場合
@@ -47,6 +48,7 @@ as_capabl <as.capabl@gmail.com>
 ## サイト
 - https://github.com/as-capabl
 - http://d.hatena.ne.jp/acaaN/
+
 # 著作権
 このライブラリは Boost Software License の元で公開されています。
 
