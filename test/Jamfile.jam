@@ -1,0 +1,37 @@
+
+import testing ;
+
+# boost::logのサンプルより
+project 
+	: requirements 
+        <link>shared:<define>BOOST_ALL_DLL
+        <logapi>unix:<define>BOOST_LOG_USE_NATIVE_SYSLOG=1
+        <toolset>msvc:<define>_SCL_SECURE_NO_WARNINGS
+        <toolset>msvc:<define>_SCL_SECURE_NO_DEPRECATE
+        <toolset>msvc:<define>_CRT_SECURE_NO_WARNINGS
+        <toolset>msvc:<define>_CRT_SECURE_NO_DEPRECATE
+        <toolset>intel-win:<define>_SCL_SECURE_NO_WARNINGS
+        <toolset>intel-win:<define>_SCL_SECURE_NO_DEPRECATE
+        <toolset>intel-win:<define>_CRT_SECURE_NO_WARNINGS
+        <toolset>intel-win:<define>_CRT_SECURE_NO_DEPRECATE
+        <toolset>gcc:<cxxflags>-fno-strict-aliasing  # avoids strict aliasing violations in other Boost components
+        <threading>single:<define>BOOST_LOG_NO_THREADS
+        <threading>multi:<library>/boost/thread//boost_thread
+	: default-build <c++-template-depth>512 <link>static
+    ;
+
+use-project /megaflare : .. ;
+
+
+
+exe logtest : logtest.cpp /megaflare//boost-log ;
+
+
+# Tests
+unit-test tuples : tuples.cpp /megaflare//code ;
+unit-test literal : literal.cpp /megaflare//code ;
+unit-test building_kernel : building_kernel.cpp /megaflare//code ;
+#unit-test bad_event : bad_event.cpp opencl ; #何故か成功する
+unit-test prog : prog.cpp /megaflare//host ;
+unit-test buffer : buffer.cpp /megaflare//host ;
+unit-test stress : stress.cpp /megaflare//host ;
