@@ -126,7 +126,7 @@ namespace megaflare {
                 host::event::checked_out_t evPre = 
                     m_args.m_ev.lock_and_checkout();
                 cl_event pEvPre = evPre.get();
-				cl_event evMap = NULL;
+                cl_event evMap = NULL;
 
 
 
@@ -142,16 +142,16 @@ namespace megaflare {
 
 
                 void * pvMapped = 
-					clEnqueueMapBuffer (	
-						i_queue,
-						m_args.m_buf.get(),
-						CL_FALSE,
-						m_args.m_flags,
+                    clEnqueueMapBuffer (    
+                        i_queue,
+                        m_args.m_buf.get(),
+                        CL_FALSE,
+                        m_args.m_flags,
                         sizeof(HostType) * m_args.m_offset, 
                         sizeof(HostType) * m_args.m_size,
-						(pEvPre != NULL)?1:0,
+                        (pEvPre != NULL)?1:0,
                         (pEvPre != NULL)?&pEvPre:NULL,
-						&evMap,
+                        &evMap,
                         &err);
 
                 cl_event evToUnmap = 
@@ -176,7 +176,7 @@ namespace megaflare {
                 //futureの準備
                 std::promise<Ret> promise;
                 std::future<Ret> future = promise.get_future();
-				
+                
                 //コールバックに渡すオブジェクト
                 //コールバック側でdelete                
                 exec_and_unmap<Ret, Iterator> *pRoutine = 

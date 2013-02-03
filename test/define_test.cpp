@@ -61,7 +61,25 @@ int main() try
 
     std::vector<host::device> devices = context.getInfo<CL_CONTEXT_DEVICES>();
 
-    auto program = host::make_program(context, prog);
+    //auto program = host::make_program(context, prog);
+    //std::cout << code::get_cl_string(prog) << std::endl;
+    const char str[] = 
+        "__kernel void fill_index(int __global* pInt)"
+        "{"
+        "int id = get_global_id(0);"
+        "pInt[id] = id;"
+        "}\n"
+
+        "int twice_item(__private int val) { return val * 2;}"
+        "\n#define impl(id) twice_item(id)\n"
+        "__kernel void twice(int __global* pInt)"
+        "{"
+        "int id = get_global_id(0);"
+        "pInt[id] = impl(pInt[id]);"
+        "}"
+        "\n#undef impl\n";
+    cl::Program::Sources source(1, std::make_pair(str, std::strlen(str)));
+    cl::Program program{context, source};
 
     try {
         program.build(devices);

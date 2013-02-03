@@ -1,3 +1,5 @@
+#pragma once
+
 #include <sprout/string.hpp>
 #include <sprout/tuple.hpp>
 #include <sprout/tuple/operation.hpp>
@@ -10,11 +12,10 @@
 
 
 
-
 namespace megaflare {
     namespace code {
         // |演算子による結合をするクラス
-		// CRTPにより継承
+        // CRTPにより継承
         template <typename Derived>
         struct modifier_t {
             template <typename RhsT, 
@@ -57,7 +58,7 @@ namespace megaflare {
             return tuples::make_tuple(i_mod);
         }
 
-
+        
         template <typename T>
         struct result_mod : modifier_t<result_mod<T>>{
             template <typename BK>
@@ -71,15 +72,42 @@ namespace megaflare {
                     type_resolve<T>::str());
             }
         };
-
-
+        
+        
         template <typename T>
         constexpr result_mod<T>
         returns()
         {
             return result_mod<T>();
         }
+        
+        static constexpr auto kernel_prefix = sprout::to_string("__kernel ");
 
+        struct kernel_mod : modifier_t<kernel_mod>{
+            static constexpr detail::bk::elems result_str = detail::bk::elems::result_str;
+          
+
+            // TODO: resultが空ならvoidにしてくれるといい
+            template <typename BK>
+            constexpr auto get_cl_string(BK const& i_bk) 
+                -> decltype(
+                    detail::bk::modify<result_str>(
+                        i_bk, 
+                        kernel_prefix + detail::bk::get<result_str>(i_bk)))
+            {
+                return 
+                    detail::bk::modify<result_str>(
+                        i_bk, 
+                        kernel_prefix + detail::bk::get<result_str>(i_bk));
+            }
+        };
+
+
+        constexpr kernel_mod
+        kernel()
+        {
+            return kernel_mod();
+        }
 
         template <typename T, int N>
         struct param_mod : modifier_t<param_mod<T, N>>{

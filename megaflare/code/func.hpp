@@ -8,6 +8,8 @@
 #include "megaflare/tuples.hpp"
 #include "./type_resolve.hpp"
 #include "./param.hpp"
+#include "./raw.hpp"
+#include "mods.hpp"
 
 namespace megaflare {
     namespace code {
@@ -17,7 +19,44 @@ namespace megaflare {
             sprout::string<NBody> m_body;
             sprout::string<NName> m_name;
 
+        private:
+            template <typename ModTuple_>
+            struct ensure_tuple {
+                typedef tuples::tuple<ModTuple_> type;
+                constexpr type operator() (ModTuple_ const & i_mod)
+                {
+                    return type(i_mod);
+                }
+            };
+            template <typename... Mods>
+            struct ensure_tuple<tuples::tuple<Mods...>> {
+                typedef tuples::tuple<Mods...> type;
+                constexpr type operator() (type const & i_tuple)
+                {
+                    return i_tuple;
+                }
+            };
 
+        public:
+            
+            template <typename Mod>
+            constexpr 
+            func_t<typename tuples::types::push_back<
+                       typename ensure_tuple<ModTuple>::type, 
+                       Mod>::type,
+                   NBody,
+                   NName>
+            modify(Mod const & i_mod)
+            {
+                static_assert(
+                std::is_base_of<modifier_t<Mod>, Mod>::value,
+                "need modifier");
+
+                return {tuples::push_back(
+                        ensure_tuple<ModTuple>()(m_mods), i_mod),
+                        m_body,
+                        m_name};
+            }
 
             struct get_params_op {
                 template <class Tuple, class T>
@@ -148,7 +187,8 @@ namespace megaflare {
                                 get_cl_string_op(),
                                 detail::bk::construct(i_sym, text::ss_blank),
                                 i_mods),
-                            i_body), i_name))
+                            i_body), 
+                        i_name))
             {
                 return 
                     detail::bk::modify<detail::bk::elems::name_str>(
@@ -157,25 +197,46 @@ namespace megaflare {
                                 get_cl_string_op(),
                                 detail::bk::construct(i_sym, text::ss_blank),
                                 i_mods),
-                            i_body), i_name);
+                            i_body), 
+                        i_name);
+            }
+
+            template <typename BK>
+            static constexpr auto expand_bk(BK i_bk)
+                -> tuples::tuple<detail::bk::symbol,
+                decltype (detail::bk::to_string(
+                                 detail::bk::modify<detail::bk::elems::result_str>(
+                                     i_bk, 
+                                     detail::bk::get<detail::bk::elems::result_str>(i_bk))))>
+            {
+                return tuples::make_tuple(
+                    detail::bk::get<detail::bk::elems::symbol>(i_bk),
+                    detail::bk::to_string(
+                        detail::bk::modify<detail::bk::elems::result_str>(
+                            i_bk, 
+                            detail::bk::get<detail::bk::elems::result_str>(i_bk))))
+                    ;
             }
 
         public:        
             constexpr auto get_cl_string(detail::bk::symbol i_sym)
                 -> decltype(
-                    get_cl_string_impl(
-                        modifier_tuple(m_mods), 
-                        m_body, 
-                        m_name,
-                        i_sym
-                    ))
+                    expand_bk(
+                        get_cl_string_impl(
+                            modifier_tuple(m_mods), 
+                            m_body, 
+                            m_name,
+                            i_sym
+                        )))
             {
                 return 
-                    get_cl_string_impl(
-                        modifier_tuple(m_mods), 
-                        m_body, 
-                        m_name,
-                        i_sym
+                    expand_bk(
+                        get_cl_string_impl(
+                            modifier_tuple(m_mods), 
+                            m_body, 
+                            m_name,
+                            i_sym
+                        )
                     );
             }
 
@@ -187,75 +248,52 @@ namespace megaflare {
              Signature i_mods, 
              char const (&i_body)[NBody])
         {
-            return {
-                i_mods, 
+            return { i_mods, 
                     sprout::to_string(i_body), 
                     sprout::to_string(i_name)};
         }
 
-        // kernel
-        static constexpr auto kernel_prefix = sprout::to_string("__kernel ");
-        template <typename Func>
-        struct kernel_t {
-            Func m_func;
-       
-            template <typename BK>
-            static constexpr auto set_name_and_stringize(BK i_bk)
-            -> decltype (detail::bk::to_string(
-                             detail::bk::modify<detail::bk::elems::result_str>(
-                                 i_bk, 
-                                 kernel_prefix + detail::bk::get<detail::bk::elems::result_str>(i_bk))))
-            {
-                return 
-                    detail::bk::to_string(
-                        detail::bk::modify<detail::bk::elems::result_str>(
-                            i_bk, 
-                            kernel_prefix + detail::bk::get<detail::bk::elems::result_str>(i_bk)))
-                    ;
-            }
-
-            constexpr auto get_cl_string(detail::bk::symbol i_sym)
-                ->decltype (                tuples::make_tuple(
-                                                detail::bk::get<detail::bk::elems::symbol>(m_func.get_cl_string(i_sym)), 
-                                                set_name_and_stringize(
-                                                    m_func.get_cl_string(i_sym)
-                                                )))
-            {
-                return 
-                    tuples::make_tuple(
-                        detail::bk::get<detail::bk::elems::symbol>(m_func.get_cl_string(i_sym)), 
-                        set_name_and_stringize(
-                            m_func.get_cl_string(i_sym)
-                        ));
-            }
-
-            template <typename... Params>
-            auto operator() (Params... i_params)
-                -> decltype(m_func(i_params...))
-            {
-                return m_func(std::forward<Params>(i_params)...);
-            }
-        };
-
-        template <typename Func>
-        constexpr kernel_t<Func> 
-        kernel(Func i_func)
-        {
-            return {i_func};
-        }
 
     
         // program
         template <typename... Args>
-        using program_t = sprout::tuple<Args...>;
+        using program_t = tuples::tuple<Args...>;
+
+        struct program_op {
+            template <typename ModTuple, std::size_t NBody, std::size_t NName, typename... Args>
+            constexpr auto 
+            operator() (tuples::tuple<Args...> i_lhs, 
+                        func_t<ModTuple, NBody, NName> i_rhs)
+                -> typename tuples::tuple<Args..., decltype(i_rhs)>
+            {
+                return tuples::push_back(i_lhs, i_rhs);
+            }
+
+            template <typename Raw, typename... Args>
+            constexpr auto 
+            operator() (tuples::tuple<Args...> i_lhs, 
+                        Raw i_rhs)
+                -> typename tuples::tuple<Args..., Raw>
+            {
+                //TODO: get_cl_stringの有無をチェックしてほしい
+                return tuples::push_back(i_lhs, i_rhs);
+            }
+        };
 
         template <typename... Args>
-        constexpr program_t<Args...> 
-        program(Args... args)
+        constexpr auto
+        program(Args... i_args)
+            -> decltype(
+                tuples::foldl(program_op(), 
+                              tuples::tuple<>(),
+                              sprout::make_tuple(i_args...)
+                              ))
         {
-            return program_t<Args...>(args...);
+            return tuples::foldl(program_op(),
+                                 tuples::tuple<>(),
+                                 sprout::make_tuple(i_args...)
+                                 );
         }
-
 
         struct get_cl_string_helper {
             template <typename T>
@@ -275,9 +313,18 @@ namespace megaflare {
         template <typename... Args>
         inline constexpr auto
         get_cl_string(program_t<Args...> const& i_program)
-            -> decltype(text::unlines(tuples::get<1>(tuples::map_accum_l(get_cl_string_helper(),i_program, detail::bk::symbol()))))
+            -> decltype(
+                text::unlines(
+                    tuples::get<1>(
+                        tuples::map_accum_l(get_cl_string_helper(),
+                                            i_program, 
+                                            detail::bk::symbol()))))
         {
-            return text::unlines(tuples::get<1>(tuples::map_accum_l(get_cl_string_helper(), i_program, detail::bk::symbol())));
+            return text::unlines(
+                tuples::get<1>(
+                    tuples::map_accum_l(get_cl_string_helper(), 
+                                        i_program, 
+                                        detail::bk::symbol())));
         }
 
 

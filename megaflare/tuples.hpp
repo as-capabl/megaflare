@@ -228,7 +228,7 @@ namespace megaflare {
                 nth(T i_t) { return m_un(i_t); }
             };
         }
-	
+    
         template <typename Un, typename Tuple>
         inline constexpr auto transform(Un i_un, Tuple const& i_tp) 
             -> decltype(detail::transform_impl<detail::transform_op<Un>, 0, std::tuple_size<Tuple>::value, Tuple>(i_tp)
@@ -291,7 +291,7 @@ namespace megaflare {
             return detail::pad_impl<N, sizeof...(Args) < N, T, Args...>::impl(i_tp, i_t);
         }
 
-        // modify_tuple				
+        // modify_tuple                
         namespace detail {
             template <int I, typename T>
             struct modify_tuple_op {

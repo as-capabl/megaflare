@@ -40,7 +40,7 @@ int main() try
 #if 0
     auto compiled_prog = prog.compile();
     auto compiled_kern = compiled_prog.get_kernel<decltype(x)>("x_kern");
-#endif	
+#endif    
 
 
     return 0;

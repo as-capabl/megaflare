@@ -1,10 +1,11 @@
+// stub
+
 #define __CL_ENABLE_EXCEPTIONS
 #include <CL/cl.hpp>
 #include <iostream>
 #include <thread>
 #include <cstdlib>
 #include <numeric>
-//#include <unistd.h>
 #include <boost/log/trivial.hpp>
 #include <boost/log/core.hpp>
 #include <boost/log/filters.hpp>
@@ -12,7 +13,7 @@
 #include <megaflare/code.hpp>
 #include <megaflare/platform.hpp>
 #include <megaflare/host.hpp>
-#include "pair_range.hpp"
+#include "./pair_range.hpp"
 
 namespace pfm = megaflare::platform;
 namespace chrono = std::chrono;
@@ -21,26 +22,30 @@ namespace host = megaflare::host;
 namespace stpl = sprout::tuples;
 namespace mtpl = megaflare::tuples;
 
+
+auto defs = sprout::to_string("#define COEFF 2\n");
+
+auto twice = code::func(
+    "twice",
+    code::returns<pfm::int_>()|
+    code::param<pfm::int_>("num"),
+    "return num * COEFF;"
+);
+
 auto fill_index = code::func(
     "fill_index",
     code::returns<pfm::void_>()|
     code::param<code::global<pfm::int_>*>("pInt"),
     "int id = get_global_id(0);\n"
-    "pInt[id] = id;"
+    "pInt[id] = twice(id);"
 );
 
-auto twice = code::func(
-    "twice",
-    code::returns<pfm::void_>()|
-    code::param<code::global<pfm::int_>*>("pInt"),
-    "int id = get_global_id(0);\n"
-    "pInt[id] = pInt[id] * 2;"
-);
 
 
 auto prog = code::program (
-    code::kernel(fill_index),
-    code::kernel(twice)
+    code::raw(defs),
+    code::common_func(twice),
+    code::kernel(fill_index)
 );
 
 static constexpr int item_count = 1000;
@@ -88,29 +93,7 @@ int main() try
 
 
     queue(run_kernel(program, fill_index(bufWrite), item_count));
-    queue(run_kernel(program, twice(bufWrite), item_count));
 
-
-    // std::function渡し
-    std::function<cl_int(cl_int*, cl_int*)> funcSum =
-        [](cl_int* outMapPtr, cl_int* end) -> cl_int 
-        {
-            cl_int sum = 0;
-            auto rangeOut = std::make_pair(outMapPtr, end);
-            
-            for( cl_int i : rangeOut ) {
-                sum += i;
-            }
-            return sum;
-        };
-
-    auto future = queue(bufWrite.with_range(funcSum));
-
-    chrono::steady_clock::time_point tp = chrono::steady_clock::now();  
-    std::future_status result = future.wait_until(tp + chrono::seconds(3));
-
-    assert(result == std::future_status::ready);
-    assert(future.get() == item_count * (item_count - 1) / 2 * 2);
 
     // const
     host::buffer<pfm::int_> const & bufConst = bufWrite;

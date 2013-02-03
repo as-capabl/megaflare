@@ -34,4 +34,8 @@ unit-test building_kernel : building_kernel.cpp /megaflare//code ;
 #unit-test bad_event : bad_event.cpp opencl ; #何故か成功する
 unit-test prog : prog.cpp /megaflare//host ;
 unit-test buffer : buffer.cpp /megaflare//host ;
+unit-test higher : higher.cpp /megaflare//host ;
 unit-test stress : stress.cpp /megaflare//host ;
+unit-test define_test : define_test.cpp /megaflare//host ;
+unit-test raw : raw.cpp /megaflare//host ;
+unit-test common_func : common_func.cpp /megaflare//host ;

@@ -101,11 +101,11 @@ int main() try {
         {
             std::string str = program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(devices[0]);
 
-			BOOST_LOG_TRIVIAL(fatal) << "Compilation error";
-			BOOST_LOG_TRIVIAL(info) << "Source:\n"
-									<< get_cl_string(prog);
-			BOOST_LOG_TRIVIAL(info) << "Build log:\n"
-									<< str;
+            BOOST_LOG_TRIVIAL(fatal) << "Compilation error";
+            BOOST_LOG_TRIVIAL(info) << "Source:\n"
+                                    << get_cl_string(prog);
+            BOOST_LOG_TRIVIAL(info) << "Build log:\n"
+                                    << str;
             return -1;
         }
         else {
@@ -134,10 +134,10 @@ int main() try {
     typedef decltype(bufWrite)::iterator iterator;
     for (int ii = 0; ii < 20; ++ii) {
         auto future2 = 
-			queue(bufWrite.with_range(
-					  [](iterator i_begin, iterator i_end){
-						  return std::accumulate(i_begin, i_end, 0);
-					  }));
+            queue(bufWrite.with_range(
+                      [](iterator i_begin, iterator i_end){
+                          return std::accumulate(i_begin, i_end, 0);
+                      }));
         cl_int retval = future2.get();
         std::cout << retval << std::endl;
         assert( retval %  (item_count * (item_count - 1) / 2) == 0);
