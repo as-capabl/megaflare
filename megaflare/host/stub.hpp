@@ -6,6 +6,8 @@ namespace megaflare {
         typedef cl::Platform platform;
         typedef cl::Device device;
 
+        template <typename ProgramCode> using program = cl::Program;
+
         template <typename Program>
         inline cl::Program make_program(context i_context, Program i_prog)
         {

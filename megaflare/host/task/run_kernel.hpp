@@ -76,11 +76,11 @@ namespace megaflare {
         template <typename Calling>
         struct run_kernel_task : task<run_kernel_task<Calling>> {
 
-            cl::Program& m_program;
+            cl::Program const & m_program;
             Calling m_pack;
             std::size_t m_size; //本当はNDRange
 
-            run_kernel_task(cl::Program & i_program, Calling i_pack, std::size_t i_size) :
+            run_kernel_task(cl::Program const & i_program, Calling i_pack, std::size_t i_size) :
                 m_program(i_program),
                 m_pack(i_pack),
                 m_size(i_size)
@@ -161,7 +161,7 @@ namespace megaflare {
 
         template <typename Calling>
         inline run_kernel_task<Calling>
-        run_kernel (cl::Program & i_program, Calling i_pack, std::size_t i_size)
+        run_kernel (cl::Program const & i_program, Calling i_pack, std::size_t i_size)
         {
             return {i_program, i_pack, i_size};
         }        

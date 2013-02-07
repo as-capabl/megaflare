@@ -5,9 +5,11 @@
 #include <boost/intrusive_ptr.hpp>
 #include <CL/cl.hpp>
 #include "megaflare/defs.hpp"
+#include "megaflare/tuples.hpp"
 #include "event.hpp"
 #include "task/with_range.hpp"
 #include "buffer_policy.hpp"
+
 
 void intrusive_ptr_add_ref(_cl_mem* i_ptr)
 {
@@ -80,7 +82,7 @@ namespace megaflare {
                 delete pRoutine;
             }
 
-            sprout::tuple<cl_int, std::size_t>
+            tuples::tuple<cl_int, std::size_t>
             range_check(cl_int i_offset, 
                      std::size_t i_size) const
             {
@@ -91,7 +93,7 @@ namespace megaflare {
                     i_size = m_size - i_offset;
                 }
 
-                return sprout::make_tuple(i_offset, i_size);
+                return tuples::make_tuple(i_offset, i_size);
             }
 
             template <typename Routine>
@@ -100,7 +102,7 @@ namespace megaflare {
                      cl_int i_offset = 0,
                      std::size_t i_size = 0)
             {
-                sprout::tie(i_offset, i_size) =
+                tuples::tie(i_offset, i_size) =
                     range_check(i_offset, i_size);
                 return with_range_args<Routine, host_type> {
                     m_buf, m_ev, i_size, i_offset, i_routine, 
@@ -113,13 +115,15 @@ namespace megaflare {
                      cl_int i_offset = 0,
                      std::size_t i_size = 0) const
             {
-                sprout::tie(i_offset, i_size) =
+                tuples::tie(i_offset, i_size) =
                     range_check(i_offset, i_size);
 
                 return with_range_args<Routine, host_type> {
                     m_buf, m_ev, i_size, i_offset, i_routine, 
                         policies::const_map_flag<Policy>() };
             }
+
+            std::size_t size() const { return (std::size_t)m_size; }
 
             //friend struct buffer_handler<TypeSpec, Policy>;
             

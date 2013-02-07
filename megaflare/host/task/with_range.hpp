@@ -3,6 +3,9 @@
 #include <future>
 #include <memory>
 #include <CL/cl.hpp>
+#include <boost/log/trivial.hpp>
+#include <boost/log/core.hpp>
+#include <boost/log/filters.hpp>
 #include "megaflare/defs.hpp"
 #include "megaflare/host/event.hpp"
 #include "task.hpp"
@@ -10,6 +13,26 @@
 
 namespace megaflare {
     namespace host {
+            template <typename T>
+            struct exec_and_unlock
+            {
+                template <typename Func>
+                void operator() (Func i_func, std::promise<T>& i_promise)
+                {
+                    i_promise.set_value(i_func());
+                }
+            };
+
+            template <>
+            struct exec_and_unlock<void>
+            {
+                template <typename Func>
+                void operator() (Func i_func, std::promise<void>& i_promise)
+                {
+                    i_func();
+                    i_promise.set_value();
+                }
+            };
 
         template <typename Ret, typename Iterator>
         struct exec_and_unmap {
@@ -21,18 +44,26 @@ namespace megaflare {
             std::promise<Ret> m_promise;
             host::event::checked_out_t m_evToUnmap;
 
+
             void operator () ()
             {
                 //値を返す
-                auto ret = m_routine(m_pvMapped, m_pvMapped + m_size);
-                m_promise.set_value(ret);
+                exec_and_unlock<Ret>() (
+                    [=]() {
+                        return m_routine(m_pvMapped, 
+                                         m_pvMapped + m_size);
+                    },
+                    m_promise
+                );
 
                 //イベントを開放
                 ::clSetUserEventStatus(m_evToUnmap.get(), CL_COMPLETE);
+#if 0
                 BOOST_LOG_TRIVIAL(MF_LOG_QUEUING)
                     << "host::buffer " << m_buf.get()
                     << ": Released user event "
                     << m_evToUnmap.get() << ".";
+#endif
             }
 
             static void run(exec_and_unmap<Ret, Iterator>* i_pThis)
