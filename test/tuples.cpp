@@ -4,6 +4,7 @@
 #include <sprout/tuple.hpp>
 #include <cassert>
 #include <iostream>
+#include <type_traits>
 
 namespace lit =  megaflare::text;
 namespace mtpl = megaflare::tuples;
@@ -39,6 +40,20 @@ int main()
     auto tuple1 = sprout::make_tuple(1);
     assert(mtpl::foldr1(test_bi(), tuple1) == 1);
     assert(mtpl::foldl(test_bi(), 1, tuple1) == 2);
+
+    //fold 型エラー
+    auto tuple_illtype = sprout::make_tuple(1, 2, mtpl::tuple<>());
+
+    auto err_fold = mtpl::foldr1(test_bi(), tuple_illtype);
+    typedef mtpl::type_error_on_fold<test_bi(int, mtpl::tuple<>)> expected;
+    bool is_same_val = std::is_same<decltype(err_fold), expected>::value;
+    assert(is_same_val);
+
+    auto err_fold2 = mtpl::foldl(test_bi(), 0, tuple_illtype);
+    typedef mtpl::type_error_on_fold<test_bi(int, mtpl::tuple<>)> expected2;
+    bool is_same_val2 = std::is_same<decltype(err_fold2), expected>::value;
+    assert(is_same_val2);
+
     //map_accum
     auto map_accum_result4 = stpl::get<1>(mtpl::map_accum_l(test_mapaccum(), tuple4, 1));
     assert(stpl::get<0>(map_accum_result4) == 1);

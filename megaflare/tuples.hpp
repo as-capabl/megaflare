@@ -30,7 +30,60 @@ namespace megaflare {
         }
 
 // foldr1 -------------------------------------
+        template <typename Signature>
+        struct type_error_on_fold {};
+
         namespace detail {
+            struct apply_impl {
+                template <typename Err, typename Bi, typename Lhs, typename Rhs>
+                static constexpr 
+                auto
+                impl2(Err, Bi bi, Lhs lhs, Rhs rhs)
+                    -> decltype(bi(lhs, rhs))
+                {
+                    return bi(lhs, rhs);
+                }
+
+                // 型エラー発生
+                template <typename Err>
+                static constexpr
+                Err
+                impl2(Err, ...) {
+                    return {};
+                }
+
+                // 既に型エラー(fordr)
+                template <typename Err, typename Bi, typename Lhs, typename Signature>
+                static constexpr 
+                auto
+                impl2(Err, Bi bi, Lhs lhs, type_error_on_fold<Signature> rhs)
+                    -> decltype(rhs)
+                {
+                    return rhs;
+                }
+
+                // 既に型エラー(foldl)
+                template <typename Err, typename Bi, typename Signature, typename Rhs>
+                static constexpr 
+                auto
+                impl2(Err, Bi bi, type_error_on_fold<Signature> lhs, Rhs rhs)
+                    -> decltype(lhs)
+                {
+                    return lhs;
+                }
+
+
+                template <typename Bi, typename Lhs, typename Rhs, typename Err = type_error_on_fold<Bi(Lhs, Rhs)> >
+                static constexpr
+                auto
+                impl(Bi bi, Lhs lhs, Rhs rhs)
+                    -> decltype(impl2(Err(), bi, lhs, rhs))
+                {
+                    return impl2(Err(), bi, lhs, rhs);
+                }
+            };
+
+
             template <typename Bi, std::size_t N, std::size_t IdxMax, typename Tuple>
             struct
             foldr1_type
@@ -38,16 +91,24 @@ namespace megaflare {
                 typedef typename std::tuple_element<N, Tuple>::type t1_t;
                 typedef typename std::enable_if<(std::tuple_size<Tuple>::value > N)
                     , foldr1_type<Bi, N+1, IdxMax, Tuple> >::type t2_t;
-    
-            typedef typename std::result_of<
-                Bi(t1_t,  typename t2_t::type)
-                >::type type;
-    
+                
+                
+                
                 static constexpr 
-                type impl(Bi bi, const Tuple& tp){
-                    return bi(sprout::get<N>(tp), t2_t::impl(bi, tp));
+                auto
+                impl(Bi bi, const Tuple& tp)
+                    -> decltype(
+                        apply_impl::impl(bi, sprout::get<N>(tp), 
+                            t2_t::impl(bi, tp)))
+                {
+                    return 
+                        apply_impl::impl(bi, sprout::get<N>(tp), t2_t::impl(bi, tp));
                 }
                 
+                typedef decltype(
+                    impl(std::declval<Bi>(),
+                         std::declval<Tuple>()))
+                type;
             };
             
             template <typename Bi, std::size_t IdxMax, typename Tuple>
@@ -64,8 +125,8 @@ namespace megaflare {
             };
         }
 
-        template <typename Bi, typename Tuple
-                  , typename Impl = detail::foldr1_type<Bi, 0, std::tuple_size<Tuple>::value - 1, Tuple> >
+        template <typename Bi, typename Tuple,
+                  typename Impl = detail::foldr1_type<Bi, 0, std::tuple_size<Tuple>::value - 1, Tuple> >
         inline constexpr typename Impl::type foldr1(Bi bi, Tuple tp)
         {
             return Impl::impl(bi, tp);
@@ -91,9 +152,10 @@ namespace megaflare {
                     template <typename Former>
                     constexpr auto
                     operator() (Former former)
-                        -> decltype(packed(bi(former, later)))
+                        -> decltype(packed(
+                                        apply_impl::impl(bi,former, later)))
                     {
-                        return packed(bi(former, later));
+                        return packed(apply_impl::impl(bi,former, later));
                     }
                 };
 
