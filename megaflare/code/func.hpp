@@ -82,9 +82,9 @@ namespace megaflare {
             struct arg_substitute_op {
                 template <typename Type, typename Applied>
                 constexpr auto operator() (Type const & i_type, Applied & i_applied) 
-                    -> decltype(i_applied.subst_to_param(i_type))&
+                    -> decltype(subst_to_param(i_type, i_applied))&
                 {
-                    return i_applied.subst_to_param(i_type);
+                    return subst_to_param(i_type, i_applied);
                 }
             };
 
@@ -101,7 +101,7 @@ namespace megaflare {
 
                 static type run(TpParams const& i_param, TpArgs... & i_args)
                 {
-                    return next::run(i_params, i_args)
+                    return next::run(i_params, i_args);
                         }
             };
 
@@ -120,8 +120,8 @@ namespace megaflare {
                                                      sprout::index_tuple<Indexes...>)
                 -> decltype(
                     tuples::tie(
-                        (tuples::get<Indexes>(i_args)
-                         .subst_to_param(tuples::get<Indexes>(i_params)))...))
+                        (subst_to_param(tuples::get<Indexes>(i_args),
+                                        tuples::get<Indexes>(i_params)))...))
 
             {
                 // 引数の個数チェック
@@ -132,8 +132,8 @@ namespace megaflare {
 
                 return 
                     tuples::tie(
-                        (tuples::get<Indexes>(i_args)
-                         .subst_to_param(tuples::get<Indexes>(i_params)))...);
+                        (subst_to_param(tuples::get<Indexes>(i_args),
+                                        tuples::get<Indexes>(i_params)))...);
             }        
 
             template <typename... Args>

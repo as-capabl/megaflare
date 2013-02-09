@@ -58,12 +58,6 @@ namespace megaflare {
 
                 //イベントを開放
                 ::clSetUserEventStatus(m_evToUnmap.get(), CL_COMPLETE);
-#if 0
-                BOOST_LOG_TRIVIAL(MF_LOG_QUEUING)
-                    << "host::buffer " << m_buf.get()
-                    << ": Released user event "
-                    << m_evToUnmap.get() << ".";
-#endif
             }
 
             static void run(exec_and_unmap<Ret, Iterator>* i_pThis)
@@ -87,28 +81,11 @@ namespace megaflare {
                     static_cast<exec_and_unmap<Ret, Iterator>*>(i_pData);
 
                 auto routine = [ pThis, i_ev ]() {
-                    BOOST_LOG_TRIVIAL(MF_LOG_QUEUING)
-                    << "host::buffer " << pThis->m_buf.get()
-                    << ": Thread " << std::this_thread::get_id() << " started.";
-
-
-                    BOOST_LOG_TRIVIAL(MF_LOG_QUEUING)
-                    << "host::buffer " << pThis->m_buf.get()
-                    << ": Waiting for map(event "
-                    << i_ev << ").";
                     clWaitForEvents(1, &i_ev);
                     clReleaseEvent(i_ev);
 
-                    BOOST_LOG_TRIVIAL(MF_LOG_QUEUING)
-                    << "host::buffer " << pThis->m_buf.get()
-                    << ": mapping done.";
                     (*pThis)();
                     delete pThis;
-
-                    BOOST_LOG_TRIVIAL(MF_LOG_QUEUING)
-                    << "host::buffer " << pThis->m_buf.get()
-                    << ": Thread " << std::this_thread::get_id() 
-                    << " is being terminated.";
                 };
 
                 std::thread th(std::move(routine));
@@ -162,16 +139,6 @@ namespace megaflare {
 
 
                 //マッピング
-                BOOST_LOG_TRIVIAL(MF_LOG_QUEUING)
-                    << "host::buffer " << m_args.m_buf.get()
-                    << ": Mapping pre event is "
-                    << evPre << ".";
-
-                BOOST_LOG_TRIVIAL(MF_LOG_QUEUING)
-                    << "host::buffer " << m_args.m_buf.get()
-                    << ": Enqueuing map.";
-
-
                 void * pvMapped = 
                     clEnqueueMapBuffer (    
                         i_queue,
@@ -189,9 +156,6 @@ namespace megaflare {
                     clCreateUserEvent(context, &err);
                 cl_event pUnmap;
                 //アンマップイベントを積みつつ、走り出さないようにしておく
-                BOOST_LOG_TRIVIAL(MF_LOG_QUEUING)
-                    << "host::buffer " << m_args.m_buf.get()
-                    << ": Enueuing unmap.";
                 clEnqueueUnmapMemObject(
                     i_queue,
                     m_args.m_buf.get(), 
@@ -199,9 +163,6 @@ namespace megaflare {
                     1,
                     &evToUnmap,
                     &pUnmap);
-                BOOST_LOG_TRIVIAL(MF_LOG_QUEUING)
-                    << "host::buffer " << m_args.m_buf.get()
-                    << ": Unmap(event " << pUnmap << ") done.";
                 m_args.m_ev.checkin_and_unlock(pUnmap);
                                      
                 //futureの準備

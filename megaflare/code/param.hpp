@@ -29,5 +29,31 @@ namespace megaflare {
             sprout::string<N> m_name;
             TpParams m_paramsAlt;
         };
+
+#if 0
+        // 即値
+        template <typename TypeSpec>
+        struct immediate {
+            typedef typename TypeSpec::host_type host_type;
+            host_type value;
+        };
+#endif
+
+        template <typename Type, typename TypeSpec, int N>
+        auto
+        subst_to_param(Type& i_type, param_t<TypeSpec, N> i_param)
+            -> decltype(i_type.subst_to_param(i_param))
+        {
+            return i_type.subst_to_param(i_param);
+        }
+
+        template <typename TypeSpec, int N>
+        typename TypeSpec::host_type const & 
+        subst_to_param(typename TypeSpec::host_type const & i_type, 
+                       param_t<TypeSpec, N>)
+        {
+            return i_type;
+        }
+
     }
 }
