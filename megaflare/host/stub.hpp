@@ -6,6 +6,10 @@ namespace megaflare {
         typedef cl::Platform platform;
         typedef cl::Device device;
 
+        // template <typename ProgramCode>
+        // struct program<ProgramCode> : public generic_program 
+        // になる予定？
+        typedef cl::Program generic_program;
         template <typename ProgramCode> using program = cl::Program;
 
         template <typename Program>

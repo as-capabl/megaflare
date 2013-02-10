@@ -48,7 +48,8 @@ namespace megaflare {
                 std::function<void(runner const &, 
                                    host::program<ProgramCode>)> i_func)
             {
-                host::program<ProgramCode> program = host::make_program(m_context, i_prog);
+                host::program<ProgramCode> program = 
+                    host::make_program(m_context, i_prog);
 
                 try {
                     program.build(m_devices);
@@ -58,10 +59,10 @@ namespace megaflare {
                     {
                         std::string str = program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(m_devices[m_iDeviceNo]);
 
-                        std::cerr << "Compilation error";
-                        std::cerr << "Source:\n"
+                        std::cerr << "Compilation error\n";
+                        std::cerr << "Source*************************\n"
                                   << get_cl_string(i_prog);
-                        std::cerr << "Build log:\n"
+                        std::cerr << "Build log**********************\n"
                                   << str;
                         return;
                     }

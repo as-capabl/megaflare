@@ -13,6 +13,7 @@
 #include <megaflare/code.hpp>
 #include <megaflare/platform.hpp>
 #include <megaflare/host.hpp>
+#include <megaflare/misc/runner.hpp>
 #include "./pair_range.hpp"
 
 namespace pfm = megaflare::platform;
@@ -21,101 +22,136 @@ namespace code = megaflare::code;
 namespace host = megaflare::host;
 namespace stpl = sprout::tuples;
 namespace mtpl = megaflare::tuples;
+namespace misc = megaflare::misc;
 
 
-auto defs = sprout::to_string("#define COEFF 2\n");
-
-auto twice = code::func(
-    "twice",
-    code::returns<pfm::int_>()|
-    code::param<pfm::int_>("num"),
-    "return num * COEFF;"
+auto coeff_def = sprout::to_string(
+    "#define COEFF 2\n"
 );
+
+auto coeff_undef = sprout::to_string(
+    "#undef COEFF \n"
+);
+
 
 auto fill_index = code::func(
     "fill_index",
     code::returns<pfm::void_>()|
     code::param<code::global<pfm::int_>*>("pInt"),
     "int id = get_global_id(0);\n"
-    "pInt[id] = twice(id);"
+    "pInt[id] = id;"
 );
 
-
-
-auto prog = code::program (
-    code::raw(defs),
-    code::common_func(twice),
-    code::kernel(fill_index)
+auto twice = code::func(
+    "twice",
+    code::returns<pfm::void_>()|
+    code::param<code::global<pfm::int_>*>("pInt"),
+    "int id = get_global_id(0);\n"
+    "pInt[id] = pInt[id] * COEFF;"
 );
+
 
 static constexpr int item_count = 1000;
 
-
-int main() try 
+inline constexpr int 
+arith(int i_diff, int i_num)
 {
-    std::vector<host::platform> platforms;
-    host::platform::get(&platforms);
-
-    if (platforms.size() == 0) {
-        BOOST_LOG_TRIVIAL(fatal) << "no platform";
-        return -1;
-    }
-    cl_context_properties properties[] = {
-        CL_CONTEXT_PLATFORM, (cl_context_properties)(platforms[0])(), 0};
-    host::context context(CL_DEVICE_TYPE_GPU, properties);
-
-    std::vector<host::device> devices = context.getInfo<CL_CONTEXT_DEVICES>();
-
-    auto program = host::make_program(context, prog);
-
-    try {
-        program.build(devices);
-    }
-    catch(cl::Error err) {
-        if(err.err() == CL_BUILD_PROGRAM_FAILURE)
-        {
-            std::string str = program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(devices[0]);
-
-            BOOST_LOG_TRIVIAL(fatal) << "Compilation error";
-            BOOST_LOG_TRIVIAL(info) << "Source:\n"
-                                    << get_cl_string(prog);
-            BOOST_LOG_TRIVIAL(info) << "Build log:\n"
-                                    << str;
-            return -1;
-        }
-        else {
-            throw err;
-        }
-    }
-    host::queue queue(context(), devices[0]());
-        
-    host::buffer<pfm::int_> bufWrite(context, item_count);
+    return i_diff * i_num * (i_num - 1) / 2;
+}
 
 
-    queue(run_kernel(program, fill_index(bufWrite), item_count));
+bool
+check(misc::runner const & i_runner, host::generic_program i_program)
+{
+    chrono::steady_clock::time_point tp = chrono::steady_clock::now();  
 
 
-    // const
-    host::buffer<pfm::int_> const & bufConst = bufWrite;
-    // ラムダ式渡し
+    host::buffer<pfm::int_> bufWrite(i_runner.m_context, item_count);
     typedef host::buffer<pfm::int_>::const_iterator iterator;
-    auto future2 = 
-        queue(bufConst.with_range(
-                  [](iterator i_begin, iterator i_end){
-                      return std::accumulate(i_begin, i_end, 0);
-                  }));
-    chrono::steady_clock::time_point tp2 = chrono::steady_clock::now();
-    std::future_status result2 = future2.wait_until(tp2 + chrono::seconds(5));
 
-    assert(result2 == std::future_status::ready);
-    assert(future2.get() == item_count * (item_count - 1) / 2 * 2);
+
+    i_runner.m_queue(
+        run_kernel(i_program, 
+                   fill_index(bufWrite), 
+                   item_count));
+    i_runner.m_queue(
+        run_kernel(i_program, 
+                   twice(bufWrite), 
+                   item_count));
+
+
+    auto future = 
+        i_runner.m_queue(
+            bufWrite.with_range(
+                [](iterator i_begin, iterator i_end){
+                    return std::accumulate(i_begin, i_end, 0);
+                }));
+    std::future_status result = future.wait_until(tp + chrono::seconds(5));
+    assert(result == std::future_status::ready);
+    assert(future.get() == arith(2, item_count));    
+
+    return true;
+}
+
+
+int main(int i_argc, char** i_argv) try 
+{
+    misc::runner runner(i_argc, i_argv);
+
+    // 先頭
+    auto prog1 = code::program (
+        code::raw(coeff_def),
+        code::kernel(twice),
+        code::kernel(fill_index)
+    );
+    runner.with_program<decltype(prog1)>(prog1, check);
+
+    // 末尾
+    auto prog2 = code::program (
+        code::kernel(fill_index),
+        code::raw(coeff_def),
+        code::kernel(twice),
+        code::raw(coeff_undef)
+    );
+    runner.with_program<decltype(prog2)>(prog2, check);
+
+    // 複数
+    auto prog3 = code::program (
+        code::kernel(fill_index),
+        code::raw(coeff_def),
+        code::raw(coeff_undef),
+        code::raw(coeff_def),
+        code::kernel(twice)
+    );
+    runner.with_program<decltype(prog3)>(prog3, check);
+
+    // rawだけ
+    auto prog4 = code::program (
+        code::raw(
+            sprout::to_string(
+                "__kernel void twice(int __global* pInt)\n"
+                "{\n"
+                "int id = get_global_id(0);\n"
+                "pInt[id] = pInt[id] * 2;\n"
+                "}\n"
+                "__kernel void fill_index(int __global* pInt)\n"
+                "{\n"
+                "int id = get_global_id(0);\n"
+                "pInt[id] = id;\n"
+                "}\n"
+            )
+        )
+    );
+    runner.with_program<decltype(prog4)>(prog4, check);
 
     return EXIT_SUCCESS;
 }
 catch (cl::Error err) {
-    BOOST_LOG_TRIVIAL(fatal) << err.what() << "(" << err.err() << ")" ;
+    std::cerr << err.what() << "(" << err.err() << ")" ;
     return -1;
 }
-
-
+catch (misc::running_error err) {
+    std::cerr << err;
+    return -1;
+}
 

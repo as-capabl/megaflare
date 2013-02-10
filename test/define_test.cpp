@@ -1,3 +1,8 @@
+// #defineで高階関数が作れる事の確認
+//  高階関数が完成したら削除予定
+
+
+
 #define __CL_ENABLE_EXCEPTIONS
 #include <CL/cl.hpp>
 #include <iostream>
