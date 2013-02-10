@@ -10,6 +10,7 @@ project :
 
 use-project /boost : $(boost-root) ;
 use-project /boost/log : ./boost-log/libs/log/build ;
+use-project /boost/program_options : $(boost-root)/libs/program_options/build ;
 
 
 alias boost-log : /boost/log//boost_log
@@ -17,6 +18,8 @@ alias boost-log : /boost/log//boost_log
         /boost/filesystem//boost_filesystem
         /boost/system//boost_system 
 	: : :  <include>./boost-log ;
+
+alias boost-po : /boost/program_options//boost_program_options ;
 
 
 lib opencl : : <file>/usr/lib/libOpenCL.so ;

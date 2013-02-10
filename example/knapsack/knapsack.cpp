@@ -7,9 +7,7 @@
 #include <numeric>
 #include <chrono>
 #include <iostream>
-#include <boost/log/trivial.hpp>
-#include <boost/log/core.hpp>
-#include <boost/log/filters.hpp>
+#include <boost/program_options.hpp>
 
 #include <megaflare/code.hpp>
 #include <megaflare/platform.hpp>
@@ -20,9 +18,9 @@ namespace pfm = megaflare::platform;
 namespace chrono = std::chrono;
 namespace code = megaflare::code;
 namespace host = megaflare::host;
-namespace stpl = sprout::tuples;
 namespace mtpl = megaflare::tuples;
 namespace misc = megaflare::misc;
+namespace po = boost::program_options;
 
 using namespace pfm;
 
@@ -47,6 +45,9 @@ auto step_dp = code::func(
     "  int v0 = aCurrent[id];"
     "  int v1 = aCurrent[id - iCap] + iPrice;"
     "  aNext[id] = max(v0, v1);"
+    "}"
+    "else {" 
+    "  aNext[id] = aCurrent[id];"
     "}"
 );
 
@@ -88,52 +89,119 @@ knapsack(misc::runner const & i_runner, host::program<decltype(prog)> i_program,
     
     for(int i = 0; i < (int)i_aItem.size(); ++i) {
         queue(
-            run_kernel(i_program, 
-                       step_dp(buffers[i % 2], 
-                               buffers[(i+1) % 2], 
-                               i_aItem[i].cap,
-                               i_aItem[i].price),
-                       i_nTotalCap + 1
+            run_kernel(
+                i_program, 
+                step_dp(buffers[i % 2], 
+                        buffers[(i+1) % 2], 
+                        i_aItem[i].cap,
+                        i_aItem[i].price),
+                i_nTotalCap + 1
             )
         );
     }
-    auto ret = queue(
-        buffers[i_aItem.size() % 2].with_range(
-            [](cl_int* begin, cl_int* end) {
-                return *(end - 1);
-            }
-        )
-    );
+    auto ret = 
+        queue(
+            buffers[i_aItem.size() % 2].with_range(
+                [](cl_int* begin, cl_int* end) {
+                    return *(end - 1);
+                }
+            )
+        );
     return ret.get();
 }
 
 void
-run(misc::runner const & i_runner, host::program<decltype(prog)> i_program)
+test_run(misc::runner const & i_runner, 
+         host::program<decltype(prog)> i_program)
 {
     // small test
     std::vector<item_type> aItemSmall = {
         {10, 1},
-        {20, 3}
+        {20, 3},
     };
-    int retSmall = knapsack(i_runner, i_program, aItemSmall, 30);
-    assert(retSmall == 4);
+    int ret1 = knapsack(i_runner, i_program, aItemSmall, 10);
+    assert(ret1 == 1);
 
-    // random
-    std::vector<item_type> aItem(item_count);
-    std::srand(std::chrono::steady_clock::now().time_since_epoch().count());
-    for (int i = 0; i < item_count; ++i) {
+    int ret2 = knapsack(i_runner, i_program, aItemSmall, 40);
+    assert(ret2 == 1+3);
+
+    int ret3 = knapsack(i_runner, i_program, aItemSmall, 20);
+    assert(ret3 == 3);
+
+    std::vector<item_type> aItemSingle = {
+        {10, 5}
+    };
+    int retSingle = knapsack(i_runner, i_program, aItemSingle, 100);
+    assert(retSingle == 5);
+
+    int retSingle2 = knapsack(i_runner, i_program, aItemSingle, 5);
+    assert(retSingle2 == 0);
+}
+
+std::vector<item_type>
+random_item(int i_nItemCount)
+{
+    std::vector<item_type> aItem(i_nItemCount);
+    std::srand(chrono::steady_clock::now().time_since_epoch().count());
+    for (int i = 0; i < i_nItemCount; ++i) {
         aItem[i] = item_type{std::rand() % total_cap,
                              std::rand() % price_max};
     }
-    int retRandom = knapsack(i_runner, i_program, aItem, total_cap);
-    std::cout << retRandom << std::endl;
+    return aItem;
 }
 
 
 int main(int i_argc, char** i_argv) try 
 {
-    misc::runner runner(i_argc, i_argv);
-    runner.with_program<decltype(prog)>(prog, run);
+    int nItemCount = item_count;
+    int iCap = total_cap;
+
+    po::options_description optDesc("Knapsack Options");
+    optDesc.add_options()
+        ("capacity,c", po::value<int>(&nItemCount), "Knapsack capacity.")
+        ("item-count,n", po::value<int>(&iCap), "Item count.")
+        ("test,t", "Run test.")
+        ("cl", "Run OpenCL CPU code(default).")
+        ("no-cl", "Run non-OpenCL CPU code.")
+        ("timer,x", "Time.");
+    
+    po::variables_map values;
+    
+    try {
+        po::store(
+            po::parse_command_line(i_argc, i_argv, optDesc), 
+            values
+        );
+        po::notify(values);
+
+        misc::runner runner(i_argc, i_argv);
+
+        if(values.count("capacity") || values.count("item-count")) {
+            std::vector<item_type> aItem = random_item(nItemCount);
+
+            std::cout << "GPU run" << std::endl;
+            runner.with_program<decltype(prog)>(
+                prog, 
+                [aItem, iCap](misc::runner const & i_runner, 
+                              host::program<decltype(prog)> i_program) 
+                {
+                    std::cout << aItem.size() << " items." << std::endl;
+                    std::cout << iCap << " of capacity." << std::endl;
+                    int ret = knapsack(i_runner, i_program, aItem, iCap);
+                    std::cout << ret << std::endl;
+                }
+            );
+        }
+        else {
+            runner.with_program<decltype(prog)>(prog, test_run);
+        }
+
+    }
+    catch (...) {
+        std::cerr << optDesc << std::endl;
+        return -1;
+    }
+
     return EXIT_SUCCESS;
 }
 catch (cl::Error err) {
