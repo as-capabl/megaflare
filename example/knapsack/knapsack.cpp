@@ -1,13 +1,23 @@
 #define __CL_ENABLE_EXCEPTIONS
 
+// ナップザック問題を解く
+// 参考：http://qiita.com/items/b6df73661b3293b93982
+
 #include <CL/cl.hpp>
+
 #include <iostream>
 #include <thread>
 #include <cstdlib>
 #include <numeric>
 #include <chrono>
 #include <iostream>
+#include <fstream>
+
 #include <boost/program_options.hpp>
+#include <boost/serialization/serialization.hpp>
+#include <boost/serialization/vector.hpp> 
+#include <boost/archive/text_iarchive.hpp>
+#include <boost/archive/text_oarchive.hpp>
 
 #include <megaflare/code.hpp>
 #include <megaflare/platform.hpp>
@@ -33,6 +43,26 @@ auto fill_zero = code::func(
 );
 
 
+#if 0
+// セオリー的には上の方が速そうなのだが、
+// A8-3850 iGPU + ati_drivers-12.11では
+// 下の方が3割ほど速い。謎。
+auto step_dp = code::func(
+    "step_dp",
+    code::returns<pfm::void_>()|
+    code::param<code::global<int_>*>("aCurrent")|
+    code::param<code::global<int_>*>("aNext")|
+    code::param<int_>("iCap")|
+    code::param<int_>("iPrice"),
+    "int id = get_global_id(0);\n"
+    "int v0 = aCurrent[id];"
+    "if (iCap <= id) {"
+    "  int v1 = aCurrent[id - iCap] + iPrice;"
+    "  v0 = max(v0, v1);"
+    "}"
+    "aNext[id] = v0;"
+);
+#else
 auto step_dp = code::func(
     "step_dp",
     code::returns<pfm::void_>()|
@@ -42,14 +72,15 @@ auto step_dp = code::func(
     code::param<int_>("iPrice"),
     "int id = get_global_id(0);\n"
     "if (iCap <= id) {"
-    "  int v0 = aCurrent[id];"
-    "  int v1 = aCurrent[id - iCap] + iPrice;"
-    "  aNext[id] = max(v0, v1);"
+    " int v0 = aCurrent[id];"
+    " int v1 = aCurrent[id - iCap] + iPrice;"
+    " aNext[id] = max(v0, v1);"
     "}"
-    "else {" 
-    "  aNext[id] = aCurrent[id];"
+    "else {"
+    " aNext[id] = aCurrent[id];"
     "}"
 );
+#endif
 
 
 auto prog = code::program (
@@ -64,6 +95,14 @@ constexpr int total_cap = 200;
 struct item_type {
     int cap;
     int price;
+private:
+	friend class boost::serialization::access;
+	template<class Archive>
+    void serialize( Archive& ar, unsigned int ver )
+    {
+		ar & cap;
+		ar & price;
+    }
 };
 
 int
@@ -155,15 +194,27 @@ int main(int i_argc, char** i_argv) try
 {
     int nItemCount = item_count;
     int iCap = total_cap;
+    std::string sItemInFile;
+    std::string sItemOutFile;
 
     po::options_description optDesc("Knapsack Options");
     optDesc.add_options()
-        ("capacity,c", po::value<int>(&nItemCount), "Knapsack capacity.")
-        ("item-count,n", po::value<int>(&iCap), "Item count.")
+        ("capacity,c", 
+         po::value<int>(&iCap), 
+         "Knapsack capacity.")
+        ("item-count,n", 
+         po::value<int>(&nItemCount), 
+         "Item count.")
         ("test,t", "Run test.")
         ("cl", "Run OpenCL CPU code(default).")
         ("no-cl", "Run non-OpenCL CPU code.")
-        ("timer,x", "Time.");
+        ("timer,x", "Time.")
+        ("item-file-input,i", 
+         po::value<std::string>(&sItemInFile), 
+         "Input items from file.")
+        ("item-file-output,o", 
+         po::value<std::string>(&sItemOutFile), 
+         "Output items to file.");
     
     po::variables_map values;
     
@@ -175,10 +226,35 @@ int main(int i_argc, char** i_argv) try
         po::notify(values);
 
         misc::runner runner(i_argc, i_argv);
+        std::vector<item_type> aItem;
+        bool bGpuRun = false;
 
-        if(values.count("capacity") || values.count("item-count")) {
-            std::vector<item_type> aItem = random_item(nItemCount);
+        // GPU実行が指定されているか
+        if(values.count("cl") || values.count("capacity")) {
+            bGpuRun = true;
+        }
 
+        // アイテム構築
+        if(values.count("item-file-input")) {
+            std::ifstream stream(sItemInFile);
+            boost::archive::text_iarchive ia(stream);
+            ia >> aItem;
+            bGpuRun = true;
+        }
+        else if(values.count("item-count")) {
+            aItem = random_item(nItemCount);
+            bGpuRun = true;
+        }
+
+        // アイテム保存
+        if(values.count("item-file-output")) {
+            std::ofstream stream(sItemOutFile);
+            boost::archive::text_oarchive oa(stream);
+            oa << aItem;
+        }
+
+        // 実行
+        if(bGpuRun) {
             std::cout << "GPU run" << std::endl;
             runner.with_program<decltype(prog)>(
                 prog, 

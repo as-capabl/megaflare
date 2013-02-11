@@ -19,4 +19,4 @@ project
     ;
 
 
-unit-test knapsack : knapsack.cpp /megaflare//host /megaflare//boost-po ;
+unit-test knapsack : knapsack.cpp /megaflare//host /megaflare//boost-po /boost/serialization//boost_serialization ;
