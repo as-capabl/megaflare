@@ -149,6 +149,22 @@ knapsack(misc::runner const & i_runner, host::program<decltype(prog)> i_program,
     return ret.get();
 }
 
+int knapsack_cpu(std::vector<item_type> const & i_aItem, int i_nTotalCap)
+{
+    std::vector<int> buffer(i_nTotalCap + 1);
+    for (unsigned int j = 0; j < i_aItem.size(); ++j) {
+        const item_type item = i_aItem[j];
+        for (int i = i_nTotalCap; i >= item.cap; --i) {
+            const int v0 = buffer[i];
+            const int v1 = buffer[i - item.cap] + item.price;
+            if (v1 > v0) {
+                buffer[i] = v1;
+            }
+        }
+    }
+    return buffer.back();
+}
+
 void
 test_run(misc::runner const & i_runner, 
          host::program<decltype(prog)> i_program)
@@ -206,9 +222,10 @@ int main(int i_argc, char** i_argv) try
          po::value<int>(&nItemCount), 
          "Item count.")
         ("test,t", "Run test.")
-        ("cl", "Run OpenCL CPU code(default).")
+        ("cl", "Run OpenCL GPU code(default).")
+        ("cl-cpu", "Run OpenCL CPU code.")
         ("no-cl", "Run non-OpenCL CPU code.")
-        ("timer,x", "Time.")
+        //("timer,x", "Time.")
         ("item-file-input,i", 
          po::value<std::string>(&sItemInFile), 
          "Input items from file.")
@@ -225,25 +242,36 @@ int main(int i_argc, char** i_argv) try
         );
         po::notify(values);
 
-        misc::runner runner(i_argc, i_argv);
-        std::vector<item_type> aItem;
-        bool bGpuRun = false;
+
+        // TODO: 以下の条件分岐は適当
 
         // GPU実行が指定されているか
+        cl_device_type devType;
+        bool bClRun = false;
         if(values.count("cl") || values.count("capacity")) {
-            bGpuRun = true;
+            bClRun = true;
+            devType = CL_DEVICE_TYPE_GPU;
+        }
+        // CPU実行が指定されているか
+        if(values.count("cl-cpu")) {
+            bClRun = true;
+            devType = CL_DEVICE_TYPE_CPU;
         }
 
+        misc::runner runner(devType);
+
+
         // アイテム構築
+        std::vector<item_type> aItem;
         if(values.count("item-file-input")) {
             std::ifstream stream(sItemInFile);
             boost::archive::text_iarchive ia(stream);
             ia >> aItem;
-            bGpuRun = true;
+            bClRun = true;
         }
         else if(values.count("item-count")) {
             aItem = random_item(nItemCount);
-            bGpuRun = true;
+            bClRun = true;
         }
 
         // アイテム保存
@@ -254,8 +282,22 @@ int main(int i_argc, char** i_argv) try
         }
 
         // 実行
-        if(bGpuRun) {
-            std::cout << "GPU run" << std::endl;
+        if(values.count("no-cl")) {
+            std::cout << "Native code run" << std::endl;
+            std::cout << aItem.size() << " items." << std::endl;
+            std::cout << iCap << " of capacity." << std::endl;
+            int ret = knapsack_cpu(aItem, iCap);
+            std::cout << ret << std::endl;
+        }
+        else if(bClRun) {
+            switch(devType) {
+            case CL_DEVICE_TYPE_GPU:
+                std::cout << "GPU run" << std::endl;
+                break;
+            case CL_DEVICE_TYPE_CPU:
+                std::cout << "CPU run" << std::endl;
+                break;
+            }
             runner.with_program<decltype(prog)>(
                 prog, 
                 [aItem, iCap](misc::runner const & i_runner, 

@@ -27,7 +27,7 @@ namespace megaflare {
         struct runner {
             runner(int i_argc, char** i_argv)
                 : m_platforms(),
-                  m_context(init_context(m_platforms)),
+                  m_context(init_context(m_platforms, CL_DEVICE_TYPE_GPU)),
                   m_devices(m_context.getInfo<CL_CONTEXT_DEVICES>()),
                   m_iDeviceNo(),
                   m_queue(m_context(), m_devices[m_iDeviceNo]()) //TODO: 例外拾おう
@@ -35,6 +35,16 @@ namespace megaflare {
                 static_cast<void>(i_argc);
                 static_cast<void>(i_argv);
             }
+
+            runner(cl_device_type i_devType = CL_DEVICE_TYPE_DEFAULT)
+                : m_platforms(),
+                  m_context(init_context(m_platforms, i_devType)),
+                  m_devices(m_context.getInfo<CL_CONTEXT_DEVICES>()),
+                  m_iDeviceNo(),
+                  m_queue(m_context(), m_devices[m_iDeviceNo]()) //TODO: 例外拾おう
+            {
+            }
+
 
             ~runner()
             {
@@ -76,7 +86,8 @@ namespace megaflare {
 
         private:
             static host::context 
-            init_context(std::vector<host::platform> & i_platforms);
+            init_context(std::vector<host::platform> & i_platforms,
+                         cl_device_type i_devType);
 
         public:
             std::vector<host::platform> m_platforms;
@@ -87,7 +98,8 @@ namespace megaflare {
         };
 
         host::context 
-        runner::init_context(std::vector<host::platform> & o_platforms)
+        runner::init_context(std::vector<host::platform> & o_platforms,
+                             cl_device_type i_devType)
         {
             host::platform::get(&o_platforms);
             if (o_platforms.size() == 0) {
@@ -100,7 +112,7 @@ namespace megaflare {
                 (cl_context_properties)(o_platforms[0])(), 
                 0};
 
-            host::context context(CL_DEVICE_TYPE_GPU, properties);
+            host::context context(i_devType, properties);
             return context; //TODO: 例外拾おう
         }
     }
