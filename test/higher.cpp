@@ -4,10 +4,6 @@
 #include <thread>
 #include <cstdlib>
 #include <numeric>
-//#include <unistd.h>
-#include <boost/log/trivial.hpp>
-#include <boost/log/core.hpp>
-#include <boost/log/filters.hpp>
 
 #include <megaflare/code.hpp>
 #include <megaflare/platform.hpp>
@@ -52,7 +48,6 @@ int main() try
     host::platform::get(&platforms);
 
     if (platforms.size() == 0) {
-        BOOST_LOG_TRIVIAL(fatal) << "no platform";
         return -1;
     }
     cl_context_properties properties[] = {
@@ -69,13 +64,6 @@ int main() try
     catch(cl::Error err) {
         if(err.err() == CL_BUILD_PROGRAM_FAILURE)
         {
-            std::string str = program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(devices[0]);
-
-            BOOST_LOG_TRIVIAL(fatal) << "Compilation error";
-            BOOST_LOG_TRIVIAL(info) << "Source:\n"
-                                    << get_cl_string(prog);
-            BOOST_LOG_TRIVIAL(info) << "Build log:\n"
-                                    << str;
             return -1;
         }
         else {
@@ -130,7 +118,6 @@ int main() try
     return EXIT_SUCCESS;
 }
 catch (cl::Error err) {
-    BOOST_LOG_TRIVIAL(fatal) << err.what() << "(" << err.err() << ")" ;
     return -1;
 }
 

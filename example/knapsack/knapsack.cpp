@@ -278,7 +278,10 @@ int main(int i_argc, char** i_argv) try
         if(values.count("item-file-output")) {
             std::ofstream stream(sItemOutFile);
             boost::archive::text_oarchive oa(stream);
-            oa << aItem;
+
+            // ワーニング消し
+            // なぜ駄目かについてはobject trackingとrationareの説明を読め、とのこと
+            oa << const_cast<decltype(aItem) const&>(aItem);
         }
 
         // 実行

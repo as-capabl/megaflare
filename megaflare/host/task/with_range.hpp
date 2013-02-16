@@ -3,9 +3,6 @@
 #include <future>
 #include <memory>
 #include <CL/cl.hpp>
-#include <boost/log/trivial.hpp>
-#include <boost/log/core.hpp>
-#include <boost/log/filters.hpp>
 #include "megaflare/defs.hpp"
 #include "megaflare/host/event.hpp"
 #include "task.hpp"

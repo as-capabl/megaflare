@@ -6,10 +6,6 @@
 #include <thread>
 #include <cstdlib>
 #include <numeric>
-//#include <unistd.h>
-#include <boost/log/trivial.hpp>
-#include <boost/log/core.hpp>
-#include <boost/log/filters.hpp>
 
 #include <megaflare/code.hpp>
 #include <megaflare/platform.hpp>

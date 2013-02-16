@@ -6,9 +6,6 @@
 #include <thread>
 #include <cstdlib>
 #include <numeric>
-#include <boost/log/trivial.hpp>
-#include <boost/log/core.hpp>
-#include <boost/log/filters.hpp>
 
 #include <megaflare/code.hpp>
 #include <megaflare/platform.hpp>
@@ -113,7 +110,6 @@ int main(int i_argc, char** i_argv) try
     return EXIT_SUCCESS;
 }
 catch (cl::Error err) {
-    BOOST_LOG_TRIVIAL(fatal) << err.what() << "(" << err.err() << ")" ;
     return -1;
 }
 

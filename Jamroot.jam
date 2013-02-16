@@ -4,20 +4,10 @@ import path ;
 boost-root = [ modules.peek : BOOST_ROOT ] ; # 環境変数 BOOST_ROOT の値を取得
 boost-root = [ path.make $(boost-root) ] ; # パスを正規化
 
-project :
-	requirements <include>./boost-log
-	;
 
 use-project /boost : $(boost-root) ;
-use-project /boost/log : ./boost-log/libs/log/build ;
 use-project /boost/program_options : $(boost-root)/libs/program_options/build ;
 
-
-alias boost-log : /boost/log//boost_log
-        /boost/date_time//boost_date_time
-        /boost/filesystem//boost_filesystem
-        /boost/system//boost_system 
-	: : :  <include>./boost-log ;
 
 alias boost-po : /boost/program_options//boost_program_options ;
 
@@ -26,4 +16,4 @@ lib opencl : : <file>/usr/lib/libOpenCL.so ;
 
 alias code : : : : <cxxflags>"-std=gnu++0x" <include>.  <include>./Sprout ;
 
-alias host : code opencl boost-log : : : <threading>multi <cxxflags>"-pthread" ;
+alias host : code opencl : : : <threading>multi <cxxflags>"-pthread" ;
